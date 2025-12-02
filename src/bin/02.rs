@@ -4,14 +4,14 @@ fn is_invalid(number: u64, check_all: bool) -> bool {
     let number_str = number.to_string();
     let mid = number_str.len() / 2;
 
-    if check_all {
-        (1..=mid).any(|length| {
-            let times = number_str.len() / length;
-            number_str[..length].repeat(times) == number_str
-        })
-    } else {
-        number_str[..mid] == number_str[mid..]
+    if !check_all {
+        return number_str[..mid] == number_str[mid..];
     }
+
+    (1..=mid).any(|length| {
+        let times = number_str.len() / length;
+        number_str[..length].repeat(times) == number_str
+    })
 }
 
 fn total_invalid_in_range(range: &str, check_all: bool) -> u64 {
