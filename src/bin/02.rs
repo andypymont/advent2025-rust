@@ -1,10 +1,7 @@
 advent_of_code::solution!(2);
 
 fn is_invalid(number: u64, check_all: bool) -> bool {
-    let number_str = number.to_string();
-    let Ok(length) = u32::try_from(number_str.len()) else {
-        return false;
-    };
+    let length = number.ilog10() + 1;
     if !check_all && length.rem_euclid(2) != 0 {
         return false;
     }
