@@ -2,15 +2,34 @@ advent_of_code::solution!(2);
 
 fn is_invalid(number: u64, check_all: bool) -> bool {
     let number_str = number.to_string();
-    let mid = number_str.len() / 2;
-
-    if !check_all {
-        return number_str[..mid] == number_str[mid..];
+    let Ok(length) = u32::try_from(number_str.len()) else {
+        return false;
+    };
+    if !check_all && length.rem_euclid(2) != 0 {
+        return false;
     }
 
-    (1..=mid).any(|length| {
-        let times = number_str.len() / length;
-        number_str[..length].repeat(times) == number_str
+    let mid = length / 2;
+    let start = if check_all { 1 } else { mid };
+
+    (start..=mid).any(|digits_repeated| {
+        if length.rem_euclid(digits_repeated) != 0 {
+            return false;
+        }
+
+        // begin with the leftmost X tdigits
+        let divisor = 10u64.pow(length - digits_repeated);
+        let repeat = number.div_euclid(divisor);
+
+        // repeat this to fill the desired length
+        let multiplier = 10u64.pow(digits_repeated);
+        let mut check = repeat;
+        for _ in 1..length.div_euclid(digits_repeated) {
+            check = (check * multiplier) + repeat;
+        }
+
+        // compare the result to our target number
+        check == number
     })
 }
 
@@ -31,7 +50,7 @@ fn total_invalid_in_range(range: &str, check_all: bool) -> u64 {
 pub fn part_one(input: &str) -> Option<u64> {
     Some(
         input
-            .trim()
+            .trim_end()
             .split(',')
             .map(|range| total_invalid_in_range(range, false))
             .sum(),
@@ -42,7 +61,7 @@ pub fn part_one(input: &str) -> Option<u64> {
 pub fn part_two(input: &str) -> Option<u64> {
     Some(
         input
-            .trim()
+            .trim_end()
             .split(',')
             .map(|range| total_invalid_in_range(range, true))
             .sum(),
