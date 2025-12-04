@@ -1,31 +1,11 @@
+use std::iter::repeat_with;
 use std::str::FromStr;
 
 advent_of_code::solution!(4);
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Direction {
-    North,
-    Northeast,
-    East,
-    Southeast,
-    South,
-    Southwest,
-    West,
-    Northwest,
-}
-
-const COMPASS: [Direction; 8] = [
-    Direction::North,
-    Direction::Northeast,
-    Direction::East,
-    Direction::Southeast,
-    Direction::South,
-    Direction::Southwest,
-    Direction::West,
-    Direction::Northwest,
-];
-
-const GRID_SIZE: usize = if cfg!(test) { 10 } else { 139 };
+const GRID_SIZE: usize = if cfg!(test) { 12 } else { 141 };
+const TOP_LEFT: usize = GRID_SIZE + 1;
+const BOTTOM_RIGHT: usize = (GRID_SIZE - 1) * GRID_SIZE;
 
 #[derive(Debug, PartialEq)]
 struct Grid {
@@ -33,66 +13,45 @@ struct Grid {
 }
 
 impl Grid {
-    fn neighbours(pos: usize) -> impl Iterator<Item = usize> {
-        COMPASS
-            .iter()
-            .filter_map(move |dir| Self::step_in_direction(pos, *dir))
-    }
-
-    fn step_in_direction(pos: usize, dir: Direction) -> Option<usize> {
-        let row = pos / GRID_SIZE;
-        let col = pos % GRID_SIZE;
-
-        let row = match dir {
-            Direction::North | Direction::Northwest | Direction::Northeast => row.checked_sub(1),
-            Direction::South | Direction::Southwest | Direction::Southeast => {
-                let r = row + 1;
-                if r >= GRID_SIZE { None } else { Some(r) }
-            }
-            _ => Some(row),
-        }?;
-        let col = match dir {
-            Direction::West | Direction::Northwest | Direction::Southwest => col.checked_sub(1),
-            Direction::East | Direction::Northeast | Direction::Southeast => {
-                let c = col + 1;
-                if c >= GRID_SIZE { None } else { Some(c) }
-            }
-            _ => Some(col),
-        }?;
-
-        Some((row * GRID_SIZE) + col)
+    const fn neighbours(pos: usize) -> [usize; 8] {
+        [
+            pos - GRID_SIZE,
+            pos - GRID_SIZE + 1,
+            pos + 1,
+            pos + GRID_SIZE + 1,
+            pos + GRID_SIZE,
+            pos + GRID_SIZE - 1,
+            pos - 1,
+            pos - GRID_SIZE - 1,
+        ]
     }
 
     fn count_accessible_rolls(&self) -> usize {
-        self.grid
-            .iter()
-            .enumerate()
-            .filter(|(pos, is_paper)| **is_paper && self.is_accessible_by_forklift(*pos))
+        (TOP_LEFT..=BOTTOM_RIGHT)
+            .filter(|pos| self.grid[*pos] && self.is_accessible_by_forklift(*pos))
             .count()
     }
 
     fn count_all_removable_rolls(mut self) -> usize {
-        let mut removed = 0;
-        let mut just_removed = 1;
-
-        while just_removed > 0 {
-            just_removed = 0;
-
-            for pos in 0..(GRID_SIZE * GRID_SIZE) {
-                if self.grid[pos] && self.is_accessible_by_forklift(pos) {
-                    self.grid[pos] = false;
-                    removed += 1;
-                    just_removed += 1;
-                }
-            }
-        }
-
-        removed
+        repeat_with(|| {
+            (TOP_LEFT..=BOTTOM_RIGHT)
+                .map(|pos| {
+                    if self.grid[pos] && self.is_accessible_by_forklift(pos) {
+                        self.grid[pos] = false;
+                        return 1;
+                    }
+                    0
+                })
+                .sum()
+        })
+        .take_while(|removed: &usize| *removed > 0)
+        .sum()
     }
 
     fn is_accessible_by_forklift(&self, pos: usize) -> bool {
         Self::neighbours(pos)
-            .filter(|other| self.grid[*other])
+            .iter()
+            .filter(|neighbour| self.grid[**neighbour])
             .count()
             < 4
     }
@@ -108,14 +67,14 @@ impl FromStr for Grid {
         let mut grid = vec![false; GRID_SIZE * GRID_SIZE];
         for (row, line) in input.lines().enumerate() {
             for (col, ch) in line.chars().enumerate() {
-                grid[(row * GRID_SIZE) + col] = match ch {
+                let pos = ((row + 1) * GRID_SIZE) + col + 1;
+                grid[pos] = match ch {
                     '@' => true,
                     '.' => false,
                     _ => return Err(ParseGridError),
                 };
             }
         }
-
         Ok(Self { grid })
     }
 }
@@ -141,20 +100,24 @@ mod tests {
     fn example_grid() -> Grid {
         Grid {
             grid: vec![
-                false, false, true, true, false, true, true, true, true, false, true, true, true,
-                false, true, false, true, false, true, true, true, true, true, true, true, false,
-                true, false, true, true, true, false, true, true, true, true, false, false, true,
-                false, true, true, false, true, true, true, true, false, true, true, false, true,
-                true, true, true, true, true, true, false, true, false, true, false, true, false,
-                true, false, true, true, true, true, false, true, true, true, false, true, true,
-                true, true, false, true, true, true, true, true, true, true, true, false, true,
-                false, true, false, true, true, true, false, true, false,
+                false, false, false, false, false, false, false, false, false, false, false, false,
+                false, false, false, true, true, false, true, true, true, true, false, false,
+                false, true, true, true, false, true, false, true, false, true, true, false, false,
+                true, true, true, true, true, false, true, false, true, true, false, false, true,
+                false, true, true, true, true, false, false, true, false, false, false, true, true,
+                false, true, true, true, true, false, true, true, false, false, false, true, true,
+                true, true, true, true, true, false, true, false, false, false, true, false, true,
+                false, true, false, true, true, true, false, false, true, false, true, true, true,
+                false, true, true, true, true, false, false, false, true, true, true, true, true,
+                true, true, true, false, false, false, true, false, true, false, true, true, true,
+                false, true, false, false, false, false, false, false, false, false, false, false,
+                false, false, false, false,
             ],
         }
     }
 
     fn position(row: usize, col: usize) -> usize {
-        (row * GRID_SIZE) + col
+        ((row + 1) * GRID_SIZE) + col + 1
     }
 
     #[test]
