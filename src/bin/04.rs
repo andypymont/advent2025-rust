@@ -71,6 +71,25 @@ impl Grid {
             .count()
     }
 
+    fn count_all_removable_rolls(mut self) -> usize {
+        let mut removed = 0;
+        let mut just_removed = 1;
+
+        while just_removed > 0 {
+            just_removed = 0;
+
+            for pos in 0..(GRID_SIZE * GRID_SIZE) {
+                if self.grid[pos] && self.is_accessible_by_forklift(pos) {
+                    self.grid[pos] = false;
+                    removed += 1;
+                    just_removed += 1;
+                }
+            }
+        }
+
+        removed
+    }
+
     fn is_accessible_by_forklift(&self, pos: usize) -> bool {
         Self::neighbours(pos)
             .filter(|other| self.grid[*other])
@@ -109,9 +128,10 @@ pub fn part_one(input: &str) -> Option<usize> {
 }
 
 #[must_use]
-#[allow(clippy::missing_const_for_fn)]
-pub fn part_two(_input: &str) -> Option<u64> {
-    None
+pub fn part_two(input: &str) -> Option<usize> {
+    Grid::from_str(input)
+        .ok()
+        .map(Grid::count_all_removable_rolls)
 }
 
 #[cfg(test)]
@@ -164,6 +184,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(43));
     }
 }
