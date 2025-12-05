@@ -2,11 +2,9 @@ use std::str::FromStr;
 
 advent_of_code::solution!(5);
 
-type FreshRange = (u64, u64);
-
 #[derive(Debug, PartialEq)]
 struct Kitchen {
-    fresh_ranges: Vec<FreshRange>,
+    fresh_ranges: Vec<(u64, u64)>,
     ingredients: Vec<u64>,
 }
 
@@ -16,6 +14,25 @@ impl Kitchen {
             .iter()
             .map(|ingredient| u64::from(self.is_fresh(*ingredient)))
             .sum()
+    }
+
+    fn total_fresh_ingredients(&self) -> u64 {
+        let mut count = 0;
+        let mut max = 0;
+
+        for (start, finish) in &self.fresh_ranges {
+            if *start > max {
+                count += 1 + finish - start;
+                max = *finish;
+                continue;
+            }
+            if *finish > max {
+                count += finish - max;
+                max = *finish;
+            }
+        }
+
+        count
     }
 
     fn is_fresh(&self, ingredient: u64) -> bool {
@@ -74,10 +91,11 @@ pub fn part_one(input: &str) -> Option<u64> {
         .map(|kitchen| kitchen.fresh_ingredients())
 }
 
-#[allow(clippy::missing_const_for_fn)]
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u64> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    Kitchen::from_str(input)
+        .ok()
+        .map(|kitchen| kitchen.total_fresh_ingredients())
 }
 
 #[cfg(test)]
@@ -119,6 +137,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(14));
     }
 }
