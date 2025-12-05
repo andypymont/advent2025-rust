@@ -32,16 +32,9 @@ impl Kitchen {
     }
 
     fn is_fresh(&self, ingredient: u64) -> bool {
-        for (start, finish) in &self.fresh_ranges {
-            if ingredient < *start {
-                continue;
-            }
-            if ingredient <= *finish {
-                return true;
-            }
-        }
-
-        false
+        self.fresh_ranges
+            .iter()
+            .any(|(start, finish)| ingredient >= *start && ingredient <= *finish)
     }
 }
 
