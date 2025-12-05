@@ -17,22 +17,18 @@ impl Kitchen {
     }
 
     fn total_fresh_ingredients(&self) -> u64 {
-        let mut count = 0;
-        let mut max = 0;
-
-        for (start, finish) in &self.fresh_ranges {
-            if *start > max {
-                count += 1 + finish - start;
-                max = *finish;
-                continue;
-            }
-            if *finish > max {
-                count += finish - max;
-                max = *finish;
-            }
-        }
-
-        count
+        self.fresh_ranges
+            .iter()
+            .fold((0, 0), |(max, count), (start, finish)| {
+                if *start > max {
+                    return (*finish, count + 1 + finish - start);
+                }
+                if *finish > max {
+                    return (*finish, count + finish - max);
+                }
+                (max, count)
+            })
+            .1
     }
 
     fn is_fresh(&self, ingredient: u64) -> bool {
