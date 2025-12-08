@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+use std::iter::repeat_with;
 use std::str::FromStr;
 
 advent_of_code::solution!(8);
@@ -15,7 +17,7 @@ const fn straight_line_distance(first: JunctionBox, second: JunctionBox) -> u64 
 struct Decorations {
     boxes: Vec<JunctionBox>,
     connections: Vec<bool>,
-    distances: Vec<u64>,
+    nearest_pairs: VecDeque<usize>,
 }
 
 impl Decorations {
@@ -29,10 +31,10 @@ impl Decorations {
             }
 
             let mut size = 0;
-            let mut queue = Vec::new();
-            queue.push(ix);
+            let mut queue = VecDeque::new();
+            queue.push_back(ix);
 
-            while let Some(ix) = queue.pop() {
+            while let Some(ix) = queue.pop_front() {
                 if visited[ix] {
                     continue;
                 }
@@ -42,7 +44,7 @@ impl Decorations {
 
                 for other in 0..self.boxes.len() {
                     if self.connections[(ix * self.boxes.len()) + other] {
-                        queue.push(other);
+                        queue.push_back(other);
                     }
                 }
             }
@@ -54,26 +56,39 @@ impl Decorations {
         sizes
     }
 
-    fn connect_closest_boxes(&mut self, quantity: u64) {
-        let mut distances: Vec<(usize, u64)> = self.distances.iter().copied().enumerate().collect();
-        distances.sort_unstable_by(|(_, a), (_, b)| b.cmp(a));
-
-        let mut completed = 0;
-        while let Some((ix, _dist)) = distances.pop() {
-            if !self.connections[ix] {
-                self.connections[ix] = true;
-
-                let a = ix / self.boxes.len();
-                let b = ix % self.boxes.len();
-                self.connections[(b * self.boxes.len()) + a] = true;
-
-                completed += 1;
-
-                if completed >= quantity {
-                    return;
-                }
+    fn connect_closest_pair(&mut self) -> Option<(JunctionBox, JunctionBox)> {
+        while let Some(ix) = self.nearest_pairs.pop_front() {
+            if self.connections[ix] {
+                continue;
             }
+
+            self.connections[ix] = true;
+            let a = ix / self.boxes.len();
+            let b = ix % self.boxes.len();
+            self.connections[(b * self.boxes.len()) + a] = true;
+
+            return Some((self.boxes[a], self.boxes[b]));
         }
+
+        None
+    }
+
+    fn connect_closest_boxes(&mut self, quantity: usize) -> usize {
+        repeat_with(|| self.connect_closest_pair())
+            .flatten()
+            .take(quantity)
+            .count()
+    }
+
+    fn final_connection(&mut self) -> Option<(JunctionBox, JunctionBox)> {
+        while let Some(pair) = self.connect_closest_pair() {
+            if self.circuit_sizes().len() > 1 {
+                continue;
+            }
+            return Some(pair);
+        }
+
+        None
     }
 }
 
@@ -102,26 +117,30 @@ impl FromStr for Decorations {
         }
 
         let mut connections = vec![false; boxes.len() * boxes.len()];
-        let mut distances = vec![0; boxes.len() * boxes.len()];
+        let mut nearest_pairs = Vec::new();
+
         for a in 0..boxes.len() {
             connections[(boxes.len() + 1) * a] = true;
-
             for b in (a + 1)..boxes.len() {
-                let dist = straight_line_distance(boxes[a], boxes[b]);
-                distances[(a * boxes.len()) + b] = dist;
-                distances[(b * boxes.len()) + a] = dist;
+                nearest_pairs.push((a * boxes.len()) + b);
             }
         }
+        nearest_pairs.sort_unstable_by_key(|ix| {
+            let a = ix / boxes.len();
+            let b = ix % boxes.len();
+            straight_line_distance(boxes[a], boxes[b])
+        });
+        let nearest_pairs = nearest_pairs.into();
 
         Ok(Self {
             boxes,
             connections,
-            distances,
+            nearest_pairs,
         })
     }
 }
 
-const CONNECTIONS_PART_ONE: u64 = if cfg!(test) { 10 } else { 1000 };
+const CONNECTIONS_PART_ONE: usize = if cfg!(test) { 10 } else { 1000 };
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
@@ -132,10 +151,10 @@ pub fn part_one(input: &str) -> Option<usize> {
     })
 }
 
-#[allow(clippy::missing_const_for_fn)]
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u64> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let mut decorations = Decorations::from_str(input).ok()?;
+    decorations.final_connection().map(|(a, b)| a.0 * b.0)
 }
 
 #[cfg(test)]
@@ -172,33 +191,20 @@ mod tests {
                 (425, 690, 689),
             ],
             connections,
-            distances: vec![
-                0, 787, 908, 561, 723, 736, 1047, 321, 693, 391, 693, 1044, 709, 970, 413, 1103,
-                927, 1290, 1191, 316, 787, 0, 1019, 1041, 471, 424, 783, 1024, 795, 628, 1046, 847,
-                655, 1124, 600, 913, 1001, 979, 1103, 734, 908, 1019, 0, 507, 612, 670, 589, 790,
-                347, 867, 834, 833, 812, 322, 818, 540, 671, 605, 352, 597, 561, 1041, 507, 0, 697,
-                814, 837, 384, 524, 604, 503, 1076, 700, 492, 711, 941, 863, 1032, 811, 367, 723,
-                471, 612, 697, 0, 373, 371, 844, 521, 491, 717, 844, 372, 661, 629, 708, 878, 639,
-                681, 527, 736, 424, 670, 814, 373, 0, 648, 845, 411, 686, 1002, 495, 714, 867, 433,
-                511, 603, 735, 796, 533, 1047, 783, 589, 837, 371, 648, 0, 1100, 690, 788, 817,
-                1020, 535, 550, 968, 740, 1048, 379, 459, 809, 321, 1024, 790, 384, 844, 845, 1100,
-                0, 630, 609, 712, 1057, 860, 863, 543, 1069, 841, 1295, 1121, 328, 693, 795, 347,
-                524, 521, 411, 690, 630, 0, 738, 888, 566, 789, 610, 493, 444, 417, 740, 621, 387,
-                391, 628, 867, 604, 491, 686, 788, 609, 738, 0, 476, 1130, 338, 842, 597, 1095,
-                1082, 1106, 1056, 433, 693, 1046, 834, 503, 717, 1002, 817, 712, 888, 476, 0, 1410,
-                458, 646, 960, 1256, 1284, 1145, 996, 650, 1044, 847, 833, 1076, 844, 495, 1020,
-                1057, 566, 1130, 1410, 0, 1194, 1131, 652, 407, 344, 927, 966, 832, 709, 655, 812,
-                700, 372, 714, 535, 860, 789, 338, 458, 1194, 0, 716, 816, 1059, 1181, 900, 889,
-                626, 970, 1124, 322, 492, 661, 867, 550, 863, 610, 842, 646, 1131, 716, 0, 1000,
-                830, 981, 683, 411, 705, 413, 600, 818, 711, 629, 433, 968, 543, 493, 597, 960,
-                652, 816, 1000, 0, 802, 609, 1113, 1075, 350, 1103, 913, 540, 941, 708, 511, 740,
-                1069, 444, 1095, 1256, 407, 1059, 830, 802, 0, 455, 566, 582, 814, 927, 1001, 671,
-                863, 878, 603, 1048, 841, 417, 1082, 1284, 344, 1181, 981, 609, 455, 0, 983, 902,
-                692, 1290, 979, 605, 1032, 639, 735, 379, 1295, 740, 1106, 1145, 927, 900, 683,
-                1113, 566, 983, 0, 333, 1007, 1191, 1103, 352, 811, 681, 796, 459, 1121, 621, 1056,
-                996, 966, 889, 411, 1075, 582, 902, 333, 0, 888, 316, 734, 597, 367, 527, 533, 809,
-                328, 387, 433, 650, 832, 626, 705, 350, 814, 692, 1007, 888, 0,
-            ],
+            nearest_pairs: vec![
+                19, 7, 53, 159, 358, 192, 236, 48, 299, 58, 79, 86, 92, 85, 137, 67, 179, 9, 235,
+                108, 278, 14, 176, 25, 114, 199, 175, 316, 212, 138, 24, 190, 89, 73, 174, 111, 70,
+                43, 115, 88, 68, 99, 119, 132, 55, 154, 133, 3, 171, 317, 318, 46, 59, 194, 34,
+                116, 69, 57, 149, 296, 173, 44, 178, 259, 29, 94, 148, 97, 213, 106, 219, 234, 32,
+                93, 45, 56, 98, 277, 109, 128, 339, 8, 10, 64, 72, 279, 95, 12, 74, 150, 112, 253,
+                90, 4, 39, 117, 5, 169, 177, 135, 26, 1, 129, 172, 47, 28, 118, 295, 139, 78, 52,
+                65, 319, 254, 130, 54, 275, 239, 51, 50, 66, 156, 193, 87, 91, 107, 31, 152, 76,
+                153, 113, 49, 96, 379, 170, 258, 257, 338, 2, 35, 16, 237, 75, 214, 238, 134, 13,
+                37, 276, 337, 218, 274, 36, 110, 359, 22, 131, 27, 77, 23, 11, 30, 6, 136, 198,
+                151, 255, 155, 298, 71, 196, 195, 127, 38, 15, 197, 297, 158, 33, 191, 233, 217,
+                256, 18, 232, 215, 216, 17, 157, 211,
+            ]
+            .into(),
         }
     }
 
@@ -246,8 +252,16 @@ mod tests {
     }
 
     #[test]
+    fn test_final_connection() {
+        assert_eq!(
+            example_decorations().final_connection(),
+            Some(((216, 146, 977), (117, 168, 530))),
+        );
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(25_272));
     }
 }
