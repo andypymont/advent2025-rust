@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::iter::repeat_with;
 use std::str::FromStr;
 
@@ -17,7 +16,7 @@ const fn straight_line_distance(first: JunctionBox, second: JunctionBox) -> u64 
 struct Decorations {
     boxes: Vec<JunctionBox>,
     connections: Vec<bool>,
-    nearest_pairs: VecDeque<usize>,
+    nearest_pairs: Vec<usize>,
 }
 
 impl Decorations {
@@ -31,10 +30,10 @@ impl Decorations {
             }
 
             let mut size = 0;
-            let mut queue = VecDeque::new();
-            queue.push_back(ix);
+            let mut queue = Vec::new();
+            queue.push(ix);
 
-            while let Some(ix) = queue.pop_front() {
+            while let Some(ix) = queue.pop() {
                 if visited[ix] {
                     continue;
                 }
@@ -44,7 +43,7 @@ impl Decorations {
 
                 for other in 0..self.boxes.len() {
                     if self.connections[(ix * self.boxes.len()) + other] {
-                        queue.push_back(other);
+                        queue.push(other);
                     }
                 }
             }
@@ -57,7 +56,7 @@ impl Decorations {
     }
 
     fn connect_closest_pair(&mut self) -> Option<(JunctionBox, JunctionBox)> {
-        while let Some(ix) = self.nearest_pairs.pop_front() {
+        while let Some(ix) = self.nearest_pairs.pop() {
             if self.connections[ix] {
                 continue;
             }
@@ -118,20 +117,18 @@ impl FromStr for Decorations {
 
         let mut connections = vec![false; boxes.len() * boxes.len()];
         let mut nearest_pairs = Vec::new();
+        let mut distances = vec![0; boxes.len() * boxes.len()];
 
         for a in 0..boxes.len() {
             connections[(boxes.len() + 1) * a] = true;
             for b in (a + 1)..boxes.len() {
-                nearest_pairs.push((a * boxes.len()) + b);
+                let pos = (a * boxes.len()) + b;
+                nearest_pairs.push(pos);
+                distances[pos] = straight_line_distance(boxes[a], boxes[b]);
             }
         }
-        nearest_pairs.sort_unstable_by_key(|ix| {
-            let a = ix / boxes.len();
-            let b = ix % boxes.len();
-            straight_line_distance(boxes[a], boxes[b])
-        });
-        let nearest_pairs = nearest_pairs.into();
 
+        nearest_pairs.sort_unstable_by(|x, y| distances[*y].cmp(&distances[*x]));
         Ok(Self {
             boxes,
             connections,
@@ -192,28 +189,28 @@ mod tests {
             ],
             connections,
             nearest_pairs: vec![
-                19, 7, 53, 159, 358, 192, 236, 48, 299, 58, 79, 86, 92, 85, 137, 67, 179, 9, 235,
-                108, 278, 14, 176, 25, 114, 199, 175, 316, 212, 138, 24, 190, 89, 73, 174, 111, 70,
-                43, 115, 88, 68, 99, 119, 132, 55, 154, 133, 3, 171, 317, 318, 46, 59, 194, 34,
-                116, 69, 57, 149, 296, 173, 44, 178, 259, 29, 94, 148, 97, 213, 106, 219, 234, 32,
-                93, 45, 56, 98, 277, 109, 128, 339, 8, 10, 64, 72, 279, 95, 12, 74, 150, 112, 253,
-                90, 4, 39, 117, 5, 169, 177, 135, 26, 1, 129, 172, 47, 28, 118, 295, 139, 78, 52,
-                65, 319, 254, 130, 54, 275, 239, 51, 50, 66, 156, 193, 87, 91, 107, 31, 152, 76,
-                153, 113, 49, 96, 379, 170, 258, 257, 338, 2, 35, 16, 237, 75, 214, 238, 134, 13,
-                37, 276, 337, 218, 274, 36, 110, 359, 22, 131, 27, 77, 23, 11, 30, 6, 136, 198,
-                151, 255, 155, 298, 71, 196, 195, 127, 38, 15, 197, 297, 158, 33, 191, 233, 217,
-                256, 18, 232, 215, 216, 17, 157, 211,
-            ]
-            .into(),
+                211, 157, 17, 216, 215, 232, 18, 256, 217, 233, 191, 33, 158, 297, 197, 15, 38,
+                127, 195, 196, 71, 298, 155, 255, 151, 198, 136, 6, 30, 11, 23, 77, 27, 131, 22,
+                359, 110, 36, 274, 218, 337, 276, 37, 13, 134, 238, 214, 75, 237, 16, 35, 2, 338,
+                257, 258, 170, 379, 96, 49, 113, 153, 76, 152, 31, 107, 91, 87, 193, 156, 66, 50,
+                51, 239, 275, 54, 130, 254, 319, 65, 52, 78, 139, 295, 118, 28, 47, 172, 129, 1,
+                26, 135, 177, 169, 5, 117, 39, 4, 90, 253, 112, 150, 74, 12, 95, 279, 72, 64, 10,
+                8, 339, 128, 109, 277, 98, 56, 45, 93, 32, 234, 219, 106, 213, 97, 148, 94, 29,
+                259, 178, 44, 173, 296, 149, 57, 69, 116, 34, 194, 59, 46, 318, 317, 171, 3, 133,
+                154, 55, 132, 119, 99, 68, 88, 115, 43, 70, 111, 174, 73, 89, 190, 24, 138, 212,
+                316, 175, 199, 114, 25, 176, 14, 278, 108, 235, 9, 179, 67, 137, 85, 92, 86, 79,
+                58, 299, 48, 236, 192, 358, 159, 53, 7, 19,
+            ],
         }
     }
 
     #[test]
     fn test_parse_decorations() {
-        assert_eq!(
-            Decorations::from_str(&advent_of_code::template::read_file("examples", DAY)),
-            Ok(example_decorations()),
-        );
+        let example = example_decorations();
+        let parsed = Decorations::from_str(&advent_of_code::template::read_file("examples", DAY))
+            .expect("Error during parsing");
+        assert_eq!(parsed.boxes, example.boxes);
+        assert_eq!(parsed.connections, example.connections);
     }
 
     #[test]
