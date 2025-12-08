@@ -61,14 +61,15 @@ impl Decorations {
     }
 
     fn final_connection(&mut self) -> Option<(JunctionBox, JunctionBox)> {
-        while let Some(pair) = self.connect_closest_pair() {
-            if self.circuits.iter().any(|circuit| circuit > &0) {
-                continue;
+        repeat_with(|| {
+            if self.circuits.iter().all(|circuit| *circuit == 0) {
+                return None;
             }
-            return Some(pair);
-        }
-
-        None
+            self.connect_closest_pair()
+        })
+        .take_while(Option::is_some)
+        .flatten()
+        .last()
     }
 }
 
