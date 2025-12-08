@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::iter::repeat_with;
 use std::str::FromStr;
 
@@ -15,61 +16,41 @@ const fn straight_line_distance(first: JunctionBox, second: JunctionBox) -> u64 
 #[derive(Debug, PartialEq)]
 struct Decorations {
     boxes: Vec<JunctionBox>,
-    connections: Vec<bool>,
+    circuits: Vec<usize>,
     nearest_pairs: Vec<usize>,
 }
 
 impl Decorations {
     fn circuit_sizes(&self) -> Vec<usize> {
-        let mut sizes = Vec::new();
-        let mut visited = vec![false; self.boxes.len()];
-
-        for ix in 0..self.boxes.len() {
-            if visited[ix] {
-                continue;
-            }
-
-            let mut size = 0;
-            let mut queue = Vec::new();
-            queue.push(ix);
-
-            while let Some(ix) = queue.pop() {
-                if visited[ix] {
-                    continue;
-                }
-
-                visited[ix] = true;
-                size += 1;
-
-                for other in 0..self.boxes.len() {
-                    if self.connections[(ix * self.boxes.len()) + other] {
-                        queue.push(other);
-                    }
-                }
-            }
-
-            sizes.push(size);
+        let mut sizes = vec![0; self.boxes.len()];
+        for circuit in &self.circuits {
+            sizes[*circuit] += 1;
         }
-
         sizes.sort_unstable_by(|a, b| b.cmp(a));
         sizes
     }
 
     fn connect_closest_pair(&mut self) -> Option<(JunctionBox, JunctionBox)> {
-        while let Some(ix) = self.nearest_pairs.pop() {
-            if self.connections[ix] {
-                continue;
-            }
+        let ix = self.nearest_pairs.pop()?;
 
-            self.connections[ix] = true;
-            let a = ix / self.boxes.len();
-            let b = ix % self.boxes.len();
-            self.connections[(b * self.boxes.len()) + a] = true;
+        let a = ix / self.boxes.len();
+        let b = ix % self.boxes.len();
 
-            return Some((self.boxes[a], self.boxes[b]));
+        let (keep, discard) = match self.circuits[a].cmp(&self.circuits[b]) {
+            Ordering::Less => (self.circuits[a], self.circuits[b]),
+            Ordering::Greater => (self.circuits[b], self.circuits[a]),
+            Ordering::Equal => return Some((self.boxes[a], self.boxes[b])),
+        };
+
+        for circuit in self
+            .circuits
+            .iter_mut()
+            .filter(|circuit| circuit == &&discard)
+        {
+            *circuit = keep;
         }
 
-        None
+        Some((self.boxes[a], self.boxes[b]))
     }
 
     fn connect_closest_boxes(&mut self, quantity: usize) -> usize {
@@ -81,7 +62,7 @@ impl Decorations {
 
     fn final_connection(&mut self) -> Option<(JunctionBox, JunctionBox)> {
         while let Some(pair) = self.connect_closest_pair() {
-            if self.circuit_sizes().len() > 1 {
+            if self.circuits.iter().any(|circuit| circuit > &0) {
                 continue;
             }
             return Some(pair);
@@ -115,23 +96,22 @@ impl FromStr for Decorations {
             boxes.push((x, y, z));
         }
 
-        let mut connections = vec![false; boxes.len() * boxes.len()];
         let mut nearest_pairs = Vec::new();
         let mut distances = vec![0; boxes.len() * boxes.len()];
-
         for a in 0..boxes.len() {
-            connections[(boxes.len() + 1) * a] = true;
             for b in (a + 1)..boxes.len() {
                 let pos = (a * boxes.len()) + b;
                 nearest_pairs.push(pos);
                 distances[pos] = straight_line_distance(boxes[a], boxes[b]);
             }
         }
-
         nearest_pairs.sort_unstable_by(|x, y| distances[*y].cmp(&distances[*x]));
+
+        let circuits = (0..boxes.len()).collect();
+
         Ok(Self {
             boxes,
-            connections,
+            circuits,
             nearest_pairs,
         })
     }
@@ -159,11 +139,6 @@ mod tests {
     use super::*;
 
     fn example_decorations() -> Decorations {
-        let mut connections = vec![false; 20 * 20];
-        for ix in 0..20 {
-            connections[ix * 21] = true;
-        }
-
         Decorations {
             boxes: vec![
                 (162, 817, 812),
@@ -187,18 +162,18 @@ mod tests {
                 (984, 92, 344),
                 (425, 690, 689),
             ],
-            connections,
+            circuits: (0..20).collect(),
             nearest_pairs: vec![
-                211, 157, 17, 216, 215, 232, 18, 256, 217, 233, 191, 33, 158, 297, 197, 15, 38,
+                211, 157, 17, 216, 215, 232, 18, 256, 217, 233, 191, 33, 158, 297, 197, 38, 15,
                 127, 195, 196, 71, 298, 155, 255, 151, 198, 136, 6, 30, 11, 23, 77, 27, 131, 22,
-                359, 110, 36, 274, 218, 337, 276, 37, 13, 134, 238, 214, 75, 237, 16, 35, 2, 338,
-                257, 258, 170, 379, 96, 49, 113, 153, 76, 152, 31, 107, 91, 87, 193, 156, 66, 50,
-                51, 239, 275, 54, 130, 254, 319, 65, 52, 78, 139, 295, 118, 28, 47, 172, 129, 1,
+                359, 110, 36, 274, 218, 337, 276, 37, 13, 134, 238, 214, 75, 16, 237, 35, 2, 338,
+                257, 258, 170, 379, 96, 113, 49, 76, 153, 152, 31, 107, 87, 91, 193, 156, 66, 50,
+                51, 239, 275, 54, 130, 254, 65, 319, 52, 78, 139, 295, 118, 28, 47, 172, 129, 1,
                 26, 135, 177, 169, 5, 117, 39, 4, 90, 253, 112, 150, 74, 12, 95, 279, 72, 64, 10,
                 8, 339, 128, 109, 277, 98, 56, 45, 93, 32, 234, 219, 106, 213, 97, 148, 94, 29,
-                259, 178, 44, 173, 296, 149, 57, 69, 116, 34, 194, 59, 46, 318, 317, 171, 3, 133,
+                259, 178, 44, 173, 149, 296, 57, 69, 116, 34, 194, 59, 46, 318, 171, 317, 3, 133,
                 154, 55, 132, 119, 99, 68, 88, 115, 43, 70, 111, 174, 73, 89, 190, 24, 138, 212,
-                316, 175, 199, 114, 25, 176, 14, 278, 108, 235, 9, 179, 67, 137, 85, 92, 86, 79,
+                316, 175, 199, 114, 25, 176, 14, 108, 278, 235, 9, 179, 67, 137, 85, 92, 86, 79,
                 58, 299, 48, 236, 192, 358, 159, 53, 7, 19,
             ],
         }
@@ -206,22 +181,22 @@ mod tests {
 
     #[test]
     fn test_parse_decorations() {
-        let example = example_decorations();
-        let parsed = Decorations::from_str(&advent_of_code::template::read_file("examples", DAY))
-            .expect("Error during parsing");
-        assert_eq!(parsed.boxes, example.boxes);
-        assert_eq!(parsed.connections, example.connections);
+        assert_eq!(
+            Decorations::from_str(&advent_of_code::template::read_file("examples", DAY)),
+            Ok(example_decorations()),
+        );
     }
 
     #[test]
     fn test_connect_closest_boxes() {
         let mut decorations = example_decorations();
         decorations.connect_closest_boxes(4);
-        assert_eq!(decorations.connections[(0 * 20) + 7], true);
-        assert_eq!(decorations.connections[(0 * 20) + 19], true);
-        assert_eq!(decorations.connections[(2 * 20) + 13], true);
-        assert_eq!(decorations.connections[(8 * 20) + 16], false);
-        assert_eq!(decorations.connections[(14 * 20) + 15], false);
+        assert_eq!(
+            decorations.circuits,
+            vec![
+                0, 1, 2, 3, 4, 5, 6, 0, 8, 9, 10, 11, 12, 2, 14, 15, 16, 17, 18, 0
+            ],
+        );
     }
 
     #[test]
@@ -232,13 +207,13 @@ mod tests {
         decorations.connect_closest_boxes(4);
         assert_eq!(
             decorations.circuit_sizes(),
-            vec![3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
         );
 
         decorations.connect_closest_boxes(6);
         assert_eq!(
             decorations.circuit_sizes(),
-            vec![5, 4, 2, 2, 1, 1, 1, 1, 1, 1, 1],
+            vec![5, 4, 2, 2, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         );
     }
 
