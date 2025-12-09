@@ -39,8 +39,7 @@ struct Rectangle {
 
 impl Rectangle {
     const fn area(&self) -> u64 {
-        (1 + self.top_left.x.abs_diff(self.bottom_right.x))
-            * (1 + self.top_left.y.abs_diff(self.bottom_right.y))
+        (1 + self.bottom_right.x - self.top_left.x) * (1 + self.bottom_right.y - self.top_left.y)
     }
 
     fn center_inside_polygon(&self, polygon: &Polygon) -> bool {
