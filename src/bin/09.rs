@@ -1,34 +1,83 @@
+use std::str::FromStr;
+
 advent_of_code::solution!(9);
 
-type Tile = (u64, u64);
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Tile {
+    x: u64,
+    y: u64,
+}
+
+#[derive(Debug, PartialEq)]
+struct Rectangle {
+    top_left: Tile,
+    bottom_right: Tile,
+}
+
+impl Rectangle {
+    const fn area(&self) -> u64 {
+        (1 + self.top_left.x.abs_diff(self.bottom_right.x))
+            * (1 + self.top_left.y.abs_diff(self.bottom_right.y))
+    }
+
+    fn from_tiles(first: Tile, second: Tile) -> Self {
+        Self {
+            top_left: Tile {
+                x: first.x.min(second.x),
+                y: first.y.min(second.y),
+            },
+            bottom_right: Tile {
+                x: first.x.max(second.x),
+                y: first.y.max(second.y),
+            },
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Polygon {
+    tiles: Vec<Tile>,
+}
+
+impl Polygon {
+    fn all_rectangles(&self) -> impl Iterator<Item = Rectangle> {
+        self.tiles.iter().enumerate().flat_map(|(ix, a)| {
+            self.tiles
+                .iter()
+                .skip(ix + 1)
+                .map(|b| Rectangle::from_tiles(*a, *b))
+        })
+    }
+
+    fn max_area(&self) -> Option<u64> {
+        self.all_rectangles().map(|rect| rect.area()).max()
+    }
+}
 
 #[derive(Debug, PartialEq)]
 struct ParseTilesError;
 
-fn read_tiles(input: &str) -> Result<Vec<Tile>, ParseTilesError> {
-    let mut tiles = Vec::new();
-    for line in input.lines() {
-        let (x, y) = line.split_once(',').ok_or(ParseTilesError)?;
-        let x = x.parse().map_err(|_| ParseTilesError)?;
-        let y = y.parse().map_err(|_| ParseTilesError)?;
-        tiles.push((x, y));
+impl FromStr for Polygon {
+    type Err = ParseTilesError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        let mut tiles = Vec::new();
+        for line in input.lines() {
+            let (x, y) = line.split_once(',').ok_or(ParseTilesError)?;
+            let x = x.parse().map_err(|_| ParseTilesError)?;
+            let y = y.parse().map_err(|_| ParseTilesError)?;
+            tiles.push(Tile { x, y });
+        }
+        Ok(Self { tiles })
     }
-    Ok(tiles)
-}
-
-const fn area(first: Tile, second: Tile) -> u64 {
-    (first.0.abs_diff(second.0) + 1) * (first.1.abs_diff(second.1) + 1)
-}
-
-fn max_area(tiles: &[Tile]) -> Option<u64> {
-    (0..tiles.len())
-        .flat_map(|a| (0..tiles.len()).map(move |b| area(tiles[a], tiles[b])))
-        .max()
 }
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u64> {
-    read_tiles(input).ok().map(|tiles| max_area(&tiles))?
+    Polygon::from_str(input)
+        .ok()
+        .as_ref()
+        .map(Polygon::max_area)?
 }
 
 #[allow(clippy::missing_const_for_fn)]
@@ -41,24 +90,26 @@ pub fn part_two(_input: &str) -> Option<u64> {
 mod tests {
     use super::*;
 
-    fn example_tiles() -> Vec<Tile> {
-        vec![
-            (7, 1),
-            (11, 1),
-            (11, 7),
-            (9, 7),
-            (9, 5),
-            (2, 5),
-            (2, 3),
-            (7, 3),
-        ]
+    fn example_polygon() -> Polygon {
+        Polygon {
+            tiles: vec![
+                Tile { x: 7, y: 1 },
+                Tile { x: 11, y: 1 },
+                Tile { x: 11, y: 7 },
+                Tile { x: 9, y: 7 },
+                Tile { x: 9, y: 5 },
+                Tile { x: 2, y: 5 },
+                Tile { x: 2, y: 3 },
+                Tile { x: 7, y: 3 },
+            ],
+        }
     }
 
     #[test]
     fn test_read_tiles() {
         assert_eq!(
-            read_tiles(&advent_of_code::template::read_file("examples", DAY)),
-            Ok(example_tiles()),
+            Polygon::from_str(&advent_of_code::template::read_file("examples", DAY)),
+            Ok(example_polygon()),
         );
     }
 
