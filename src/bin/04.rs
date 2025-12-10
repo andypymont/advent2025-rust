@@ -83,7 +83,8 @@ impl FromStr for Grid {
 pub fn part_one(input: &str) -> Option<usize> {
     Grid::from_str(input)
         .ok()
-        .map(|grid| grid.count_accessible_rolls())
+        .as_ref()
+        .map(Grid::count_accessible_rolls)
 }
 
 #[must_use]
