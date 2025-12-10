@@ -1,55 +1,47 @@
 advent_of_code::solution!(1);
 
+fn rotations(input: &str) -> impl Iterator<Item = i32> {
+    input.lines().filter_map(|line| {
+        let distance: i32 = line[1..].parse().ok()?;
+        line.chars().next().map(|ch| match ch {
+            'L' => -distance,
+            'R' => distance,
+            _ => 0,
+        })
+    })
+}
+
 #[must_use]
 pub fn part_one(input: &str) -> Option<u64> {
-    let mut position = 50;
-    let mut zeroes = 0;
-
-    for line in input.lines() {
-        let Ok(distance) = line[1..].parse::<i32>() else {
-            continue;
-        };
-        let rotation = match line.chars().next() {
-            Some('L') => -distance,
-            Some('R') => distance,
-            _ => 0,
-        };
-
-        position = (position + rotation).rem_euclid(100);
-        if position == 0 {
-            zeroes += 1;
-        }
-    }
-
-    Some(zeroes)
+    Some(
+        rotations(input)
+            .fold((50, 0), |(position, zeroes), rotation| {
+                let position = (position + rotation).rem_euclid(100);
+                (position, zeroes + u64::from(position == 0))
+            })
+            .1,
+    )
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u64> {
-    let mut position = 50;
-    let mut zeroes = 0;
-
-    for line in input.lines() {
-        let Ok(distance) = line[1..].parse::<i32>() else {
-            continue;
-        };
-        let step = match line.chars().next() {
-            Some('L') => -1,
-            _ => 1,
-        };
-        for _ in 0..distance {
-            position = match position + step {
-                -1 => 99,
-                100 => 0,
-                other => other,
-            };
-            if position == 0 {
-                zeroes += 1;
-            }
-        }
-    }
-
-    Some(zeroes)
+    Some(
+        rotations(input)
+            .flat_map(|rotations| {
+                let step = rotations.signum();
+                let distance = rotations / step;
+                (0..distance).map(move |_| step)
+            })
+            .fold((50, 0), |(position, zeroes), step| {
+                let position = match position + step {
+                    -1 => 99,
+                    100 => 0,
+                    other => other,
+                };
+                (position, zeroes + u64::from(position == 0))
+            })
+            .1,
+    )
 }
 
 #[cfg(test)]
