@@ -132,8 +132,9 @@ pub fn part_one(input: &str) -> Option<usize> {
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u64> {
-    let mut decorations = Decorations::from_str(input).ok()?;
-    decorations.final_connection().map(|(a, b)| a.0 * b.0)
+    Decorations::from_str(input)
+        .ok()
+        .map(|mut decs| decs.final_connection().map(|(a, b)| a.0 * b.0))?
 }
 
 #[cfg(test)]
