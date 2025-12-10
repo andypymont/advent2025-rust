@@ -77,14 +77,16 @@ impl FromStr for Kitchen {
 pub fn part_one(input: &str) -> Option<u64> {
     Kitchen::from_str(input)
         .ok()
-        .map(|kitchen| kitchen.fresh_ingredients())
+        .as_ref()
+        .map(Kitchen::fresh_ingredients)
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u64> {
     Kitchen::from_str(input)
         .ok()
-        .map(|kitchen| kitchen.total_fresh_ingredients())
+        .as_ref()
+        .map(Kitchen::total_fresh_ingredients)
 }
 
 #[cfg(test)]
